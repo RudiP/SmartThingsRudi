@@ -62,17 +62,17 @@ def buttonPush(button){
     	//Away - ST Button 2
         name = "2"
         def currentST = device.currentState("button2")?.value
-        log.debug "Away button pushed"        
+        log.debug "Away button Pushed"        
     } else if (button == 2) {
         //Night - ST Button 3
         name = "3"
      	def currentST = device.currentState("button3")?.value
-        log.debug "Night Button pushed"         
+        log.debug "Night button Pushed"         
     } else {
         //Panic - ST Button 4
         name = "4"
      	def currentST = device.currentState("button4")?.value
-        log.debug "Panic Button pushed"         
+        log.debug "Panic button Pushed"         
     
     }
 
