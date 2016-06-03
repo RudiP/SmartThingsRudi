@@ -1,6 +1,7 @@
 /**
  *  Iris Security Keypad - Model: 3405-L
  *
+ *  v:1.13 - 05/28/2016 - Updated Arm Mode Away
  *  v:1.12 - 05/28/2016 - Added Contact capability to use with SHM
  *  v:1.11 - 05/23/2016 - Added SHM Modes buttons
  *  v:1.10 - 05/23/2016 - Added Panic Button catch and Switch capability
@@ -419,7 +420,7 @@ def setModePartial() {
 }
 def setModeON() {
     if (state.debug) log.debug 'Manual Mode: ON'
-    sendCodeEntryEvent('----', '2')
+    sendCodeEntryEvent('----', '3')
 	//sendSHMEvent("away")
 }
 def sendSHMEvent(String shmState){
