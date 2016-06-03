@@ -1,6 +1,7 @@
 /**
  *  Iris Security Keypad - Model: 3405-L
  *
+ *  v:1.14 - 06/02/2016 - UI Updated
  *  v:1.13 - 05/28/2016 - Updated Arm Mode Away
  *  v:1.12 - 05/28/2016 - Added Contact capability to use with SHM
  *  v:1.11 - 05/23/2016 - Added SHM Modes buttons
@@ -56,8 +57,19 @@ metadata {
     }
 
 
-    tiles {
-        valueTile("temperature", "device.temperature") {
+    tiles (scale: 2) {
+        multiAttributeTile(name: "keypad", type:"generic", width:6, height:4, canChangeIcon: true) {
+			tileAttribute ("device.armMode", key: "PRIMARY_CONTROL") {            		
+                attributeState("disarmed", label:'${currentValue}', icon:"st.Home.home2", backgroundColor:"#44b621")
+                attributeState("armedStay", label:'${currentValue}', icon:"st.Weather.weather4", backgroundColor:"#f1d801")
+                attributeState("armedAway", label:'${currentValue}', icon:"st.nest.nest-away", backgroundColor:"#d04e00")
+            }
+            tileAttribute("device.battery", key: "SECONDARY_CONTROL") {
+                attributeState("default", label:'Battery: ${currentValue}%', unit:"%")
+            }
+        }
+
+        valueTile("temperature", "device.temperature", width: 2, height: 2) {
             state "temperature", label: '${currentValue}°',
                 backgroundColors:[
                     [value: 31, color: "#153591"],
@@ -69,45 +81,45 @@ metadata {
                     [value: 96, color: "#bc2323"]
                 ]
         }
-        valueTile("battery", "device.battery", decoration: "flat") {
+        valueTile("battery", "device.battery", decoration: "flat", width: 2, height: 2) {
             state "battery", label:'${currentValue}% battery', unit:""
         }
-        valueTile("armMode", "device.armMode", decoration: "flat") {
+        valueTile("armMode", "device.armMode", decoration: "flat", width: 2, height: 2) {
             state "armMode", label: '${currentValue}'
         }
-        standardTile("switch", "device.switch", decoration: "flat", canChangeBackground: true) {
+        standardTile("switch", "device.switch", decoration: "flat", canChangeBackground: true, width: 2, height: 2) {
             state "off", label: 'Panic', icon:"st.alarm.alarm.alarm", backgroundColor: "#ffffff", action: "switch.on"  //, nextState: "on"
             state "on",  label: 'Panic', icon:"st.alarm.alarm.alarm", backgroundColor:"#bc2323", action: "switch.off"  //, nextState: "off"
         }
 
-        standardTile("ModeOFF", "device.armMode", decoration: "flat", canChangeBackground: true) {
-            state "disarmed", label:'OFF', icon:"st.Home.home2", backgroundColor:"#089afb"
+        standardTile("ModeOFF", "device.armMode", decoration: "flat", canChangeBackground: true, width: 2, height: 2) {
+            state "disarmed", label:'OFF', icon:"st.Home.home2", backgroundColor:"#44b621"
             state "armedStay", label:'OFF', icon:"st.Home.home2", backgroundColor:"#ffffff", action:"setModeOFF", nextState: "updating"
             state "armedAway", label:'OFF', icon:"st.Home.home2", backgroundColor:"#ffffff", action:"setModeOFF", nextState: "updating"
-            state "updating", label:'WAIT', icon:"st.Home.home2", backgroundColor:"#0164a8"
+            state "updating", label:'WAIT', icon:"st.Home.home2", backgroundColor:"#666666"
         } 
 
-        standardTile("ModePartial", "device.armMode", decoration: "flat", canChangeBackground: true) {
-            state "armedStay", label:'Partial', icon:"st.Weather.weather4", backgroundColor:"#089afb"
+        standardTile("ModePartial", "device.armMode", decoration: "flat", canChangeBackground: true, width: 2, height: 2) {
+            state "armedStay", label:'Partial', icon:"st.Weather.weather4", backgroundColor:"#f1d801"
             state "disarmed", label:'Partial', icon:"st.Weather.weather4", backgroundColor:"#ffffff", action:"setModePartial", nextState: "updating"
             state "armedAway", label:'Partial', icon:"st.Weather.weather4", backgroundColor:"#ffffff", action:"setModePartial", nextState: "updating"
-            state "updating", label:'WAIT', icon:"st.Weather.weather4", backgroundColor:"#0164a8"
+            state "updating", label:'WAIT', icon:"st.Weather.weather4", backgroundColor:"#666666"
         }
-        standardTile("ModeON", "device.armMode", decoration: "flat", canChangeBackground: true) {
-            state "armedAway", label:'ON', icon:"st.nest.nest-away", backgroundColor:"#089afb"
+        standardTile("ModeON", "device.armMode", decoration: "flat", canChangeBackground: true, width: 2, height: 2) {
+            state "armedAway", label:'ON', icon:"st.nest.nest-away", backgroundColor:"#d04e00"
             state "disarmed", label:'ON', icon:"st.nest.nest-away", backgroundColor:"#ffffff", action:"setModeON", nextState: "updating"
             state "armedStay", label:'ON', icon:"st.nest.nest-away", backgroundColor:"#ffffff", action:"setModeON", nextState: "updating"
-            state "updating", label:'WAIT', icon:"st.nest.nest-away", backgroundColor:"#0164a8"
+            state "updating", label:'WAIT', icon:"st.nest.nest-away", backgroundColor:"#666666"
         }
 
-        standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat", width: 1, height: 1) {
+        standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
             state "default", action:"refresh.refresh", icon:"st.secondary.refresh"
         }
-        standardTile("configure", "device.configure", inactiveLabel: false, decoration: "flat", width: 1, height: 1) {
+        standardTile("configure", "device.configure", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
             state "default", action:"configuration.configure", icon:"st.secondary.configure"
         }
-        main (["armMode","temperature"])
-        details (["temperature","armMode","switch","ModeOFF","ModePartial","ModeON","refresh","battery","configure"])
+        main (["keypad","armMode","temperature"])
+        details (["keypad","temperature","refresh","switch","ModeOFF","ModePartial","ModeON"])
     }
 }
 def installed() {
