@@ -1,6 +1,7 @@
 /**
  *  Iris Security Keypad - Model: 3405-L
  *
+ *  v:1.15 - 06/03/2016 - Minor Color Updates
  *  v:1.14 - 06/02/2016 - UI Updated
  *  v:1.13 - 05/28/2016 - Updated Arm Mode Away
  *  v:1.12 - 05/28/2016 - Added Contact capability to use with SHM
@@ -61,7 +62,7 @@ metadata {
         multiAttributeTile(name: "keypad", type:"generic", width:6, height:4, canChangeIcon: true) {
 			tileAttribute ("device.armMode", key: "PRIMARY_CONTROL") {            		
                 attributeState("disarmed", label:'${currentValue}', icon:"st.Home.home2", backgroundColor:"#44b621")
-                attributeState("armedStay", label:'${currentValue}', icon:"st.Weather.weather4", backgroundColor:"#f1d801")
+                attributeState("armedStay", label:'${currentValue}', icon:"st.Weather.weather4", backgroundColor:"#ffa81e")
                 attributeState("armedAway", label:'${currentValue}', icon:"st.nest.nest-away", backgroundColor:"#d04e00")
             }
             tileAttribute("device.battery", key: "SECONDARY_CONTROL") {
@@ -96,20 +97,20 @@ metadata {
             state "disarmed", label:'OFF', icon:"st.Home.home2", backgroundColor:"#44b621"
             state "armedStay", label:'OFF', icon:"st.Home.home2", backgroundColor:"#ffffff", action:"setModeOFF", nextState: "updating"
             state "armedAway", label:'OFF', icon:"st.Home.home2", backgroundColor:"#ffffff", action:"setModeOFF", nextState: "updating"
-            state "updating", label:'WAIT', icon:"st.Home.home2", backgroundColor:"#666666"
+            state "updating", label:'WAIT', icon:"st.Home.home2", backgroundColor:"#a7a0a0"
         } 
 
         standardTile("ModePartial", "device.armMode", decoration: "flat", canChangeBackground: true, width: 2, height: 2) {
-            state "armedStay", label:'Partial', icon:"st.Weather.weather4", backgroundColor:"#f1d801"
+            state "armedStay", label:'Partial', icon:"st.Weather.weather4", backgroundColor:"#ffa81e"
             state "disarmed", label:'Partial', icon:"st.Weather.weather4", backgroundColor:"#ffffff", action:"setModePartial", nextState: "updating"
             state "armedAway", label:'Partial', icon:"st.Weather.weather4", backgroundColor:"#ffffff", action:"setModePartial", nextState: "updating"
-            state "updating", label:'WAIT', icon:"st.Weather.weather4", backgroundColor:"#666666"
+            state "updating", label:'WAIT', icon:"st.Weather.weather4", backgroundColor:"#a7a0a0"
         }
         standardTile("ModeON", "device.armMode", decoration: "flat", canChangeBackground: true, width: 2, height: 2) {
             state "armedAway", label:'ON', icon:"st.nest.nest-away", backgroundColor:"#d04e00"
             state "disarmed", label:'ON', icon:"st.nest.nest-away", backgroundColor:"#ffffff", action:"setModeON", nextState: "updating"
             state "armedStay", label:'ON', icon:"st.nest.nest-away", backgroundColor:"#ffffff", action:"setModeON", nextState: "updating"
-            state "updating", label:'WAIT', icon:"st.nest.nest-away", backgroundColor:"#666666"
+            state "updating", label:'WAIT', icon:"st.nest.nest-away", backgroundColor:"#a7a0a0"
         }
 
         standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
