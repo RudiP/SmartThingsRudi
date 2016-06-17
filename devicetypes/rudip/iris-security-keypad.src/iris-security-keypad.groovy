@@ -1,12 +1,15 @@
 /**
  *  Iris Security Keypad - Model: 3405-L
  *
+ *  v:1.18 - 06/15/2016 - Added Tone (Beep) capability
+ *  v:1.17 - 06/03/2016 - Added Tamper Alert and Motion capabilities
+ *  v:1.16 - 06/03/2016 - UI Updated
  *  v:1.15 - 06/03/2016 - Minor Color Updates
  *  v:1.14 - 06/02/2016 - UI Updated
  *  v:1.13 - 05/28/2016 - Updated Arm Mode Away
  *  v:1.12 - 05/28/2016 - Added Contact capability to use with SHM
- *  v:1.11 - 05/23/2016 - Added SHM Modes buttons
- *  v:1.10 - 05/23/2016 - Added Panic Button catch and Switch capability
+ *  v:1.11 - 05/23/2016 - Added Keypad buttons
+ *  v:1.10 - 05/23/2016 - Added Switch capability for Panic Mode
  *  v:1.03 - 01/26/2016 - Updated Tiles
  *  v:1.02 - 01/19/2016 - Adapted to Iris Security Keypad by RudiP
  *  v:1.00 - 10/xx/2015 - Initial Release by Mitch Pond (Centralite Keypad)
@@ -30,18 +33,22 @@ metadata {
         capability "Configuration"
         capability "Contact Sensor"
         capability "Lock Codes"
+        capability "Motion Sensor"
         capability "Refresh"
         capability "Sensor"
         capability "Switch"
+        capability "Tamper Alert"
         capability "Temperature Measurement"
+        capability "Tone"
 
         attribute "armMode", "String"
+        attribute "lastUpdate", "String"
+        attribute "tamper", "enum", ["detected", "clear"]
 
         command "enrollResponse"
         command "setDisarmed"
         command "setArmedAway"
         command "setArmedStay"
-        command "setArmedNight"
         command "setModeOFF"
         command "setModePartial"
         command "setModeON"
@@ -53,20 +60,36 @@ metadata {
 
     preferences{
         section {
-            input "detailDebug", "boolean", title: "Enable detailed debug logging?",  defaultValue:false, displayDuringSetup:true
+            input ("tempOffset", "number", title: "Enter an offset to adjust the reported temperature", defaultValue: 0, displayDuringSetup: false)
+            input ("beepLength", "number", title: "Enter length of beep in seconds", defaultValue: 3, displayDuringSetup: false)
+            input ("motionTime", "number", title: "Time in seconds for Motion to become Inactive (Default:10, 0=disabled)",	defaultValue: 10, displayDuringSetup: false)
+            input ("detailDebug", "boolean", title: "Enable detailed debug logging?",  defaultValue:false, displayDuringSetup:false)
         }
     }
 
 
     tiles (scale: 2) {
         multiAttributeTile(name: "keypad", type:"generic", width:6, height:4, canChangeIcon: true) {
-			tileAttribute ("device.armMode", key: "PRIMARY_CONTROL") {            		
+            tileAttribute ("device.armMode", key: "PRIMARY_CONTROL") {            		
                 attributeState("disarmed", label:'${currentValue}', icon:"st.Home.home2", backgroundColor:"#44b621")
-                attributeState("armedStay", label:'${currentValue}', icon:"st.Weather.weather4", backgroundColor:"#ffa81e")
-                attributeState("armedAway", label:'${currentValue}', icon:"st.nest.nest-away", backgroundColor:"#d04e00")
+                attributeState("armedStay", label:'ARMED/STAY', icon:"st.Home.home3", backgroundColor:"#ffa81e")
+                attributeState("armedAway", label:'ARMED/AWAY', icon:"st.nest.nest-away", backgroundColor:"#d04e00")
             }
-            tileAttribute("device.battery", key: "SECONDARY_CONTROL") {
-                attributeState("default", label:'Battery: ${currentValue}%', unit:"%")
+            tileAttribute("device.lastUpdate", key: "SECONDARY_CONTROL") {
+                attributeState("default", label:'Updated: ${currentValue}')
+            }
+            /*
+			tileAttribute("device.battery", key: "SECONDARY_CONTROL") {
+				attributeState("default", label:'Battery: ${currentValue}%', unit:"%")
+			}
+			tileAttribute("device.battery", key: "VALUE_CONTROL") {
+				attributeState "VALUE_UP", action: "refresh"
+				attributeState "VALUE_DOWN", action: "refresh"
+			}
+			*/
+            tileAttribute("device.temperature", key: "VALUE_CONTROL") {
+                attributeState "VALUE_UP", action: "refresh"
+                attributeState "VALUE_DOWN", action: "refresh"
             }
         }
 
@@ -82,11 +105,14 @@ metadata {
                     [value: 96, color: "#bc2323"]
                 ]
         }
-        valueTile("battery", "device.battery", decoration: "flat", width: 2, height: 2) {
-            state "battery", label:'${currentValue}% battery', unit:""
+
+        standardTile("motion", "device.motion", decoration: "flat", canChangeBackground: true, width: 2, height: 2) {
+            state "active", label:'motion',icon:"st.motion.motion.active", backgroundColor:"#53a7c0"
+            state "inactive", label:'no motion',icon:"st.motion.motion.inactive", backgroundColor:"#ffffff"
         }
-        valueTile("armMode", "device.armMode", decoration: "flat", width: 2, height: 2) {
-            state "armMode", label: '${currentValue}'
+        standardTile("tamper", "device.tamper", decoration: "flat", canChangeBackground: true, width: 2, height: 2) {
+            state "clear", label: 'Tamper', icon:"st.motion.acceleration.inactive", backgroundColor: "#ffffff"
+            state "detected",  label: 'Tamper', icon:"st.motion.acceleration.active", backgroundColor:"#cc5c5c"
         }
         standardTile("switch", "device.switch", decoration: "flat", canChangeBackground: true, width: 2, height: 2) {
             state "off", label: 'Panic', icon:"st.alarm.alarm.alarm", backgroundColor: "#ffffff", action: "switch.on"  //, nextState: "on"
@@ -99,12 +125,11 @@ metadata {
             state "armedAway", label:'OFF', icon:"st.Home.home2", backgroundColor:"#ffffff", action:"setModeOFF", nextState: "updating"
             state "updating", label:'WAIT', icon:"st.Home.home2", backgroundColor:"#a7a0a0"
         } 
-
         standardTile("ModePartial", "device.armMode", decoration: "flat", canChangeBackground: true, width: 2, height: 2) {
-            state "armedStay", label:'Partial', icon:"st.Weather.weather4", backgroundColor:"#ffa81e"
-            state "disarmed", label:'Partial', icon:"st.Weather.weather4", backgroundColor:"#ffffff", action:"setModePartial", nextState: "updating"
-            state "armedAway", label:'Partial', icon:"st.Weather.weather4", backgroundColor:"#ffffff", action:"setModePartial", nextState: "updating"
-            state "updating", label:'WAIT', icon:"st.Weather.weather4", backgroundColor:"#a7a0a0"
+            state "armedStay", label:'Partial', icon:"st.Home.home3", backgroundColor:"#ffa81e"
+            state "disarmed", label:'Partial', icon:"st.Home.home3", backgroundColor:"#ffffff", action:"setModePartial", nextState: "updating"
+            state "armedAway", label:'Partial', icon:"st.Home.home3", backgroundColor:"#ffffff", action:"setModePartial", nextState: "updating"
+            state "updating", label:'WAIT', icon:"st.Home.home3", backgroundColor:"#a7a0a0"
         }
         standardTile("ModeON", "device.armMode", decoration: "flat", canChangeBackground: true, width: 2, height: 2) {
             state "armedAway", label:'ON', icon:"st.nest.nest-away", backgroundColor:"#d04e00"
@@ -113,97 +138,40 @@ metadata {
             state "updating", label:'WAIT', icon:"st.nest.nest-away", backgroundColor:"#a7a0a0"
         }
 
+        standardTile("beep", "device.beep", decoration: "flat", width: 2, height: 2) {
+            state "default", action:"tone.beep", icon:"st.secondary.beep", backgroundColor:"#ffffff"
+        }
+        valueTile("battery", "device.battery", decoration: "flat", width: 2, height: 2) {
+            state "battery", label:'${currentValue}% battery', unit:""
+        }
         standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
             state "default", action:"refresh.refresh", icon:"st.secondary.refresh"
         }
         standardTile("configure", "device.configure", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
             state "default", action:"configuration.configure", icon:"st.secondary.configure"
         }
-        main (["keypad","armMode","temperature"])
-        details (["keypad","temperature","refresh","switch","ModeOFF","ModePartial","ModeON"])
+        valueTile("armMode", "device.armMode", decoration: "flat", width: 2, height: 2) {
+            state "armMode", label: '${currentValue}'
+        }
+
+        main (["keypad"])
+        details (["keypad","motion","tamper","switch","ModeOFF","ModePartial","ModeON","beep","battery","refresh"])
     }
 }
+
 def installed() {
-	log.debug "Device Created"
+	log.debug "--- Device Created"
     sendEvent([name: "armMode", value: "disarmed", isStateChange: true])
 }
 
 def updated()
 {
     state.debug = ("true" == detailDebug)
+    sendEvent(name: "motion", value: "inactive", displayed:false, isStateChange: true)
     sendEvent(name: "contact", value: "closed", displayed:false, isStateChange: true)
-    sendEvent(name: "switch", value: "off", displayed:false, isStateChange: true)
+    sendEvent(name: "switch", value: "off", displayed:true, isStateChange: true)
+    sendEvent(name: "tamper", value: "clear", displayed:true, isStateChange: true)
     response(configure())
-}
-
-// parse events into attributes
-def parse(String description) {
-    if (state.debug) log.debug "Parsing '${description}'";
-    def results = [];
-
-    //------Miscellaneous Zigbee message------//
-    if (description?.startsWith('catchall:')) {
-        //log.debug zigbee.parse(description);
-        def message = zigbee.parse(description);
-
-        //------Profile-wide command (rattr responses, errors, etc.)------//
-        if (message?.isClusterSpecific == false) {
-            //------Default response------//
-            if (message?.command == 0x0B) {
-                if (message?.data[1] == 0x81) 
-                    log.error "Device: unrecognized command: "+description;
-                else if (message?.data[1] == 0x80) 
-                    log.error "Device: malformed command: "+description;
-            }
-            //------Read attributes responses------//
-            else if (message?.command == 0x01) {
-                if (message?.clusterId == 0x0402) {
-                    if (state.debug) log.debug "Device: read attribute response: "+description;
-                    results = parseTempAttributeMsg(message)
-                }}
-            else 
-                if (state.debug) log.debug "Unhandled profile-wide command: "+description;
-        }
-        //------Cluster specific commands------//
-        else if (message?.isClusterSpecific) {
-            //------IAS ACE------//
-            if (message?.clusterId == 0x0501) {
-                if (message?.command == 0x07) {
-                    //--- Key Pressed --------------
-                    if (state.debug) log.debug "--- Key pressed"
-                }
-                else if (message?.command == 0x04) {
-                    //---- Panic Button Pressed ----
-                    on()
-                }
-                else if (message?.command == 0x00) {
-                    //--- Ar Mode Pressed ---------
-                    results = handleArmRequest(message)
-                    if (state.debug) log.trace results
-                }
-                else {
-                    //if (state.debug) log.debug "${device.displayName} awake and requesting status"
-                    //results = sendStatusToDevice()
-                    //log.trace results
-                }
-            }
-            else {
-                if (state.debug) log.debug "Unhandled cluster-specific command: "+description
-            }
-        }
-    }
-    //------IAS Zone Enroll request------//
-    else if (description?.startsWith('enroll request')) {
-        List cmds = enrollResponse()
-        log.debug "Enroll response: ${cmds}"
-        results = cmds?.collect { new physicalgraph.device.HubAction(it) }
-    }
-    //------Read Attribute response------//
-    else if (description?.startsWith('read attr -')) {
-        results = parseReportAttributeMessage(description)
-    }
-
-    return results
 }
 
 def configure() {
@@ -256,6 +224,81 @@ def off() {
     sendEvent(name: "switch", value: "off")
 }
 
+// parse events into attributes
+def parse(String description) {
+    if (state.debug) log.debug "Parse - ${description}";
+    def results = [];
+
+    //------Miscellaneous Zigbee message------//
+    if (description?.startsWith('catchall:')) {
+        def message = zigbee.parse(description);
+
+        //------Profile-wide command (rattr responses, errors, etc.)------//
+        if (message?.isClusterSpecific == false) {
+            //------Default response------//
+            if (message?.command == 0x0B) {
+                if (message?.data[1] == 0x81) 
+                    log.error "Device: unrecognized command: "+message;
+                else if (message?.data[1] == 0x80) 
+                    log.error "Device: malformed command: "+message;
+            }
+            //------Read attributes responses------//
+            else if (message?.command == 0x01) {
+                if (message?.clusterId == 0x0402) {
+                    if (state.debug) log.debug "Device: read attribute response";
+                    results = parseTempAttributeMsg(message)
+                }}
+            else 
+                if (state.debug) log.debug "Unhandled profile-wide command: "+message;
+        }
+        //------Cluster specific commands------//
+        else if (message?.isClusterSpecific) {
+            //------IAS ACE------//
+            if (message?.clusterId == 0x0501) {
+                if (message?.command == 0x07) {
+                    //--- Motion Detected --------------
+                    motionON()
+                }
+                else if (message?.command == 0x04) {
+                    //---- Panic Button Pressed ----
+                    on()
+                }
+                else if (message?.command == 0x00) {
+                    //--- Ar Mode Pressed ---------
+                    results = handleArmRequest(message)
+                    if (state.debug) log.trace results
+                }
+                else {
+                    //if (state.debug) log.debug "${device.displayName} awake and requesting status"
+                    //results = sendStatusToDevice()
+                    //log.trace results
+                }
+            }
+            else {
+                if (state.debug) log.debug "Unhandled cluster-specific command: "+message
+            }
+        }
+    }
+
+	//------Read Attribute response------//
+    else if (description?.startsWith('read attr -')) {
+        results = parseReportAttributeMessage(description)
+    }
+
+    //------Zone Status------//
+    else if (description?.startsWith('zone status')) {
+    	results = parseIasMessage(description)
+    }
+
+    //------IAS Zone Enroll request------//
+    else if (description?.startsWith('enroll request')) {
+        List cmds = enrollResponse()
+        log.debug "Enroll response: ${cmds}"
+        results = cmds?.collect { new physicalgraph.device.HubAction(it) }
+    }
+
+return results
+}
 
 //------Generate IAS Zone Enroll response------//
 def enrollResponse() {
@@ -297,9 +340,49 @@ private parseTempAttributeMsg(message) {
     createEvent(getTemperatureResult(getTemperature(temp.encodeHex() as String)))
 }
 
+private Map parseIasMessage(String description) {
+    List parsedMsg = description.split(' ')
+    String msgCode = parsedMsg[2]
+    
+    Map resultMap = [:]
+    switch(msgCode) {
+        case '0x0020': // Closed/No Motion/Dry
+            break
 
-//TODO: find actual good battery voltage range and update this method with proper values for min/max
-//
+        case '0x0021': // Open/Motion/Wet
+            break
+
+        case '0x0022': // Tamper Alarm
+            break
+
+        case '0x0023': // Battery Alarm
+            break
+
+        case '0x0024': // Supervision Report
+            break
+
+        case '0x0025': // Restore Report
+            break
+
+        case '0x0026': // Trouble/Failure
+            break
+
+        case '0x0028': // Test Mode
+            break
+        case '0x0000':
+	        if (state.debug) log.debug "--- Tamper: Clear"
+			resultMap = createEvent(name: "tamper", value: "cleared", isStateChange: true, displayed: true)
+            break
+        case '0x0004':
+	        if (state.debug) log.debug "--- Tamper: Detected"
+			resultMap = createEvent(name: "tamper", value: "detected", isStateChange: true, displayed: true)
+            break
+        default:
+        	if (state.debug) log.debug "Invalid message code in IAS message: ${msgCode}"
+    }
+    return resultMap
+}
+
 //Converts the battery level response into a percentage to display in ST
 //and creates appropriate message for given level
 
@@ -346,6 +429,42 @@ private Map getTemperatureResult(value) {
         value: value,
         descriptionText: descriptionText
     ]
+}
+
+private Map getMotionResult(value) {
+	String linkText = getLinkText(device)
+	String descriptionText = value == 'active' ? "${linkText} detected motion" : "${linkText} motion has stopped"
+	return [
+		name: 'motion',
+		value: value,
+		descriptionText: descriptionText
+	]
+}
+def motionON() {
+    if (state.debug) log.debug "--- Motion Detected"
+    sendEvent(name: "motion", value: "active", displayed:true, isStateChange: true)
+    
+	//-- Calculate Inactive timeout value
+	def motionTimeRun = (settings.motionTime?:0).toInteger()
+
+	//-- If Inactive timeout was configured
+	if (motionTimeRun > 0) {
+		if (state.debug) log.debug "--- Will become inactive in $motionTimeRun seconds"
+		runIn(motionTimeRun, "motionOFF")
+	}
+}
+
+def motionOFF() {
+	if (state.debug) log.debug "--- Motion Inactive (OFF)"
+    sendEvent(name: "motion", value: "inactive", displayed:true, isStateChange: true)
+}
+
+def beep(def beepLength = settings.beepLength) {
+	if (state.debug) log.debug "--- Beep: ${beepLength} seconds"
+	def len = zigbee.convertToHexString(beepLength, 2)
+	List cmds = ["raw 0x501 {09 01 04 05${len}}", 'delay 200',
+				 "send 0x${device.deviceNetworkId} 1 1", 'delay 500']
+	cmds
 }
 
 //------Command handlers------//
@@ -402,25 +521,27 @@ def notifyPanelStatusChanged(status) {
 }
 //------------------------//
 
-def setArmedAway() {
-    sendEvent([name: "armMode", value: "armedAway", isStateChange: true])
-    refresh()
-}
-
 def setDisarmed() {
-    sendEvent([name: "armMode", value: "disarmed", isStateChange: true])
+    setArmMode("disarmed")
     off()
     refresh()
 }
 
 def setArmedStay() {
-    sendEvent([name: "armMode", value: "armedStay", isStateChange: true])
+    setArmMode("armedStay")
     refresh()
 }
 
-def setArmedNight() {
-    sendEvent([name: "armMode", value: "armedNight", isStateChange: true])
+def setArmedAway() {
+    setArmMode("armedAway")
     refresh()
+}
+
+def setArmMode(String armState) {
+    sendEvent([name: "armMode", value: armState, isStateChange: true])
+    def lastUpdate = formatLocalTime(now())
+    sendEvent(name: "lastUpdate", value: lastUpdate, displayed: false)
+	if (state.debug) log.trace "Received SHM State: "+armState
 }
 
 def setModeOFF() {
@@ -448,6 +569,9 @@ def acknowledgeArmRequest(armMode){
     ]
     def results = cmds?.collect { new physicalgraph.device.HubAction(it) }
     if (state.debug) log.trace "Method: acknowledgeArmRequest(armMode): "+results
+    def lastUpdate = formatLocalTime(now())
+    sendEvent(name: "lastUpdate", value: lastUpdate, displayed: false)
+    
     return results
 }
 
@@ -456,8 +580,8 @@ def sendInvalidKeycodeResponse(){
         "raw 0x501 {09 01 00 04}",
         "send 0x${device.deviceNetworkId} 1 1", "delay 100"
     ]
-
     if (state.debug) log.trace 'Method: sendInvalidKeycodeResponse(): '+cmds
+
     return (cmds?.collect { new physicalgraph.device.HubAction(it) }) + sendStatusToDevice()
 }
 
@@ -482,4 +606,20 @@ private byte[] reverseArray(byte[] array) {
         i++;
     }
     return array
+}
+
+private formatLocalTime(time, format = "EEE, MMM d yyyy @ h:mm a z") {
+	if (time instanceof Long) {
+    	time = new Date(time)
+    }
+	if (time instanceof String) {
+    	//get UTC time
+    	time = timeToday(time, location.timeZone)
+    }   
+    if (!(time instanceof Date)) {
+    	return null
+    }
+	def formatter = new java.text.SimpleDateFormat(format)
+	formatter.setTimeZone(location.timeZone)
+	return formatter.format(time)
 }
