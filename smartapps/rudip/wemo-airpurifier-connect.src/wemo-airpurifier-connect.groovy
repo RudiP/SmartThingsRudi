@@ -1,6 +1,7 @@
 /**
 *  WeMo AirPurifier (Connect)
 *
+*  v:1.0d - 01/18/2017 - Updated Scheduled Refresh and Device Sync
 *  v:1.0c - 01/10/2017 - Initial Version
 *
 *  Pending: Name, Refresh/Pool time
@@ -159,11 +160,8 @@ def initialize() {
     if (selectedAirPurifiers)
     {
         addAirPurifiers()
+        runIn(5, "subscribeToDevices") //initial subscriptions delayed by 5 seconds
     }
-
-    runIn(5, "subscribeToDevices") //initial subscriptions delayed by 5 seconds
-    runIn(10, "refresh") //refresh devices, delayed by 10 seconds
-    runIn(900, "doDeviceSync") //setup ip:port syncing every 15 minutes
 }
 
 def resubscribe() {
@@ -173,10 +171,6 @@ def resubscribe() {
 
 def refresh() {
     log.info "--- Refresh Devices"
-    //reschedule the refreshes
-    int refreshMin = settings.refreshTime ? settings.refreshTime : 5
-    int refreshSec = refreshMin * 60
-    runIn(refreshSec, "refresh", [overwrite: false])
     refreshDevices()
 }
 
@@ -195,6 +189,17 @@ def subscribeToDevices() {
     devices.each { d ->
         d.subscribe()
     }
+
+    // Schedule Refresh & Device Sync
+    int refreshMin = settings.refreshTime ? settings.refreshTime : 5
+    String refreshSchedule = "0 0/" + refreshMin.toString() + " * 1/1 * ? *"
+    schedule(refreshSchedule, "refresh")
+    //int refreshSec = refreshMin * 60
+    //runIn(refreshSec, "refresh")
+
+    schedule("0 0/30 * 1/1 * ? *", "doDeviceSync")  // setup ip:port syncing every 30 minutes
+    // runIn(900, "doDeviceSync") //setup ip:port syncing every 15 minutes
+
 }
 def addAirPurifiers() {
     def AirPurifiers = getWemoAirPurifiers()
@@ -369,8 +374,6 @@ private def parseDiscoveryMessage(String description) {
 
 def doDeviceSync(){
     log.info "--- Verifying Devices"
-    runIn(900, "doDeviceSync" , [overwrite: false]) //schedule to run again in 15 minutes
-
     if(!state.subscribe) {
         subscribe(location, null, locationHandler, [filterEvents:false])
         state.subscribe = true
