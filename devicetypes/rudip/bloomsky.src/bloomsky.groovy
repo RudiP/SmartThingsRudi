@@ -5,10 +5,15 @@
 *
 *  Version History:  
 *
-*  2.1.3 - 01/30/2016 - Bug Fixes
-*  2.1.2 - 01/27/2016 - Added Unit options
-*  2.1.1 - 01/25/2016 - Added STORM capabilities (testing)
-*  2.1.0 - 01/15/2016 - UI updated (by RudiP)
+*  2.2.0 - 02/07/2017 - HTML testing
+*  2.1.7 - 02/06/2017 - Fixed background colors for Temperature in Celsius
+*  2.1.6 - 02/03/2017 - Added tiles for Wind and Rain. Using Temp unit from Location (removed from preferences)
+*  2.1.5 - 02/01/2017 - WindDirection validation fixed
+*  2.1.4 - 01/30/2017 - Temperature Bug Fixes
+*  2.1.3 - 01/30/2017 - Minor Bug Fixes for STORM data
+*  2.1.2 - 01/27/2017 - Added Unit options
+*  2.1.1 - 01/25/2017 - Added STORM capabilities (testing)
+*  2.1.0 - 01/15/2017 - UI updated (by RudiP)
 *  2.0.3 - Updated BloomSky API references
 *  2.0.2 - Fixed DST issue and display time in AM/PM
 *  2.0.1 - Fixde issue with pollster
@@ -34,7 +39,7 @@
 *
 */
 
-def getVersion() { return "2.1.3"}
+def getVersion() { return "2.2.0"}
 
 metadata {
     definition (name: "Bloomsky", namespace: "RudiP", author: "Tim Slagle") {
@@ -57,7 +62,6 @@ metadata {
         attribute "windSpeed", "number"
         attribute "windDirection", "string"
         attribute "windGust", "number"
-        attribute "msgStorm", "string"
     }
 
     simulator {
@@ -67,7 +71,7 @@ metadata {
     tiles(scale:2) {
         multiAttributeTile(name: "main", type:"generic", width:6, height:4, canChangeIcon: true) {
 			tileAttribute("device.temperature", key: "PRIMARY_CONTROL") {
-				attributeState("default", label:'${currentValue}°', icon:"st.Weather.weather2", backgroundColors: getTempColors())
+				attributeState("temperature", label:'${currentValue}°', icon:"st.Weather.weather2", backgroundColors: getTempColors())
 			}
             tileAttribute("device.lastUpdated", key: "SECONDARY_CONTROL") {
                 attributeState("default", label:'Updated: ${currentValue}')
@@ -79,34 +83,40 @@ metadata {
         }
 
         carouselTile("cameraDetails", "device.image", width: 4, height: 4) { }
-        valueTile("temperature", "device.temperature",  width: 2, height: 2) {
-            state("default", label:'${currentValue}°', backgroundColors: getTempColors())
-        }
-        valueTile("uv", "device.ultravioletIndex", width: 2, height: 2) {
-            state "default", label:'${currentValue} UV',
-                backgroundColors:[
-                    [value: 1, color: "#289500"],
-                    [value: 3, color: "#F7e400"],
-                    [value: 6, color: "#F85900"],
-                    [value: 8, color: "#d80010"],
-                    [value: 11, color: "#6B49C8"]
-                ]
+        valueTile("temperature", "device.temperature", inactiveLabel: false, width: 2, height: 2) {
+            state("temperature", label:'${currentValue}°', backgroundColors: getTempColors())
         }
         standardTile("water", "device.water", width: 2, height: 2) {
             state "dry", icon:"st.alarm.water.dry", backgroundColor:"#ffffff"
             state "wet", icon:"st.alarm.water.wet", backgroundColor:"#53a7c0"
         }
-        valueTile("humidity", "device.humidity", inactiveLabel: false, width: 2, height: 2) {
-            state "humidity", label:'${currentValue}% humidity', unit:""
-        }
-        valueTile("pressure", "device.pressure", inactiveLabel: false, width: 2, height: 2) {
-            state "pressure", label:'Pressure: ${currentValue}', unit:""
+        valueTile("uv", "device.ultravioletIndex", width: 2, height: 2) {
+            state "default", label:'${currentValue} UV',
+                backgroundColors:[
+                    [value: 1, color: "#289500"],
+                    [value: 3, color: "#f1d801"],
+                    [value: 6, color: "#ffa500"],
+                    [value: 8, color: "#f04937"],
+                    [value: 11, color: "#800f87"]
+                ]
         }
         valueTile("light", "device.illuminance", decoration: "flat", width: 2, height: 2) {
             state "default", label:'${currentValue} Lux'
         }
+        valueTile("humidity", "device.humidity", inactiveLabel: false, width: 2, height: 2) {
+            state "humidity", label:'${currentValue}% humidity', unit:""
+        }
+        valueTile("pressure", "device.pressure", inactiveLabel: false, width: 2, height: 2) {
+            state("pressure", label:'Pressure:\n${currentValue}', backgroundColors: getPressureColors())
+        }
         valueTile("battery", "device.battery", decoration: "flat", width: 2, height: 2) {
-            state "default", label:'${currentValue}% Battery'
+            state "default", label:'${currentValue}% Battery', 
+            backgroundColors:[
+                    [value: 0, color: "#0d0d0c"],
+  					[value: 5, color: "#d04e00"],
+                    [value: 10, color: "#d80010"],
+                    [value: 15, color: "#ffffff"]
+                ]
         }
         valueTile("lastUpdated", "device.lastUpdated", decoration: "flat", width: 2, height: 2) {
             state "default", label:'${currentValue}'
@@ -122,12 +132,17 @@ metadata {
         valueTile("msgStorm", "device.msgStorm", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
             state "default", label:'${currentValue}'
         }
+        valueTile("msgStormRain", "device.msgStormRain", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
+            state "default", label:'${currentValue}'
+        }
+		htmlTile(name:"detailHTML", action: "getDetailHTML", width: 6, height: 4)
 
         standardTile("refresh", "device.weather", decoration: "flat", width: 2, height: 2) {
             state "default", label: "", action: "refresh", icon:"st.secondary.refresh"
         }
         main(["main"])
-        details(["cameraDetails", "temperature", "uv",  "water", "humidity", "pressure", "deviceMode", "light", "lastUpdated", "msgStorm", "refresh", "battery", "deviceType"])
+        details(["cameraDetails", "temperature", "water", "uv", "light", "humidity", "deviceMode", "pressure", "lastUpdated", "msgStorm", "msgStormRain", "refresh", "battery", "deviceType", "detailHTML"])
+        //details(["cameraDetails", "temperature", "water", "detailHTML", "msgStorm", "msgStormRain", "refresh"])
     }
 
     preferences {
@@ -139,33 +154,86 @@ metadata {
     }
 }    
 
-def getTempColors() {
-	def colorMap
+mappings {
+	path("/getDetailHTML") {action: [GET: "getDetailHTML"]}
+}
 
-    if (tempScale()=="C") {
+def getTempColors() {
+	def colorMap = []
+    colorMap = [
+        [value: 0, color: "#a39393"],
+        [value: 4, color: "#c56fc5"],
+        [value: 5, color: "#800f87"],
+        [value: 20, color: "#0e47e3"],
+        [value: 35, color: "#1e9cbb"],
+        [value: 50, color: "#90d2a7"],
+        [value: 65, color: "#f1d801"],
+        [value: 80, color: "#ffa500"],
+        [value: 95, color: "#d04e00"],
+        [value: 110, color: "#bc2323"]
+    ]
+    return colorMap
+}
+
+def getTempColors2() {
+	def colorMap = []
+    if (state?.tempMetric) {
 		colorMap = [
 			// Celsius Color Range
-			[value: 0, color: "#153591"],
-			[value: 7, color: "#1e9cbb"],
-			[value: 15, color: "#90d2a7"],
-			[value: 23, color: "#44b621"],
-			[value: 29, color: "#f1d801"],
-			[value: 33, color: "#d04e00"],
-			[value: 36, color: "#bc2323"]
-			]
+			[value: -23, color: "#a39393"],
+			[value: -15, color: "#c56fc5"],
+			[value: -7, color: "#800f87"],
+			[value: 1, color: "#0e47e3"],
+			[value: 2, color: "#1e9cbb"],
+			[value: 10, color: "#90d2a7"],
+			[value: 18, color: "#f1d801"],
+			[value: 27, color: "#ffa500"],
+			[value: 35, color: "#d04e00"],
+			[value: 43, color: "#bc2323"]
+		]
 	} else {
 		colorMap = [
 			// Fahrenheit Color Range
-			[value: 40, color: "#153591"],
-			[value: 44, color: "#1e9cbb"],
-			[value: 59, color: "#90d2a7"],
-			[value: 74, color: "#44b621"],
-			[value: 84, color: "#f1d801"],
-			[value: 92, color: "#d04e00"],
-			[value: 96, color: "#bc2323"]
+            [value: 32, color: "#153591"],
+            [value: 44, color: "#1e9cbb"],
+            [value: 59, color: "#90d2a7"],
+            [value: 74, color: "#44b621"],
+            [value: 84, color: "#f1d801"],
+            [value: 92, color: "#d04e00"],
+            [value: 98, color: "#bc2323"]
 		]
 	}
+    return colorMap
 }
+
+def getPressureColors() {
+	def colorMap = []
+    if ("true" == pressureMbar) {
+		colorMap = [
+			// mbar Color Range
+			[value: 0, color: "#1e9cbb"],
+            [value: 1009, color: "#289500"],
+            [value: 1022, color: "#ffa500"]
+		]
+	} else {
+		colorMap = [
+			// inHg Color Range
+			[value: 0, color: "#1e9cbb"],
+            [value: 29.80, color: "#289500"],
+            [value: 30.20, color: "#ffa500"]
+		]
+	}
+    return colorMap
+}
+
+def getPressureUnit() {
+	def unit = "inHg"
+    if ("true" == pressureMbar) {
+        unit = "mbar"
+	}
+    return unit
+}
+
 
 def installed() {
     log.info "--- BloomSky - Version: ${getVersion()}"
@@ -209,6 +277,8 @@ private def callAPI() {
     def data = [:]
     
     try {
+		tempUnitEvent(getTemperatureScale())
+
         httpGet([
             //uri: "https://thirdpartyapi.appspot.com",    
             uri: "https://api.bloomsky.com",
@@ -267,7 +337,7 @@ private def callAPI() {
                             def presValue = datum.toDouble().trunc(2)
                             def presUnit = "inHg"
                             if (("true" == pressureMbar)) {
-                                presValue =  (presValue / 0.0295301).round(0).toInteger()
+                                presValue =  (presValue * 33.8639).round(0).toInteger()
                                 presUnit = "mbar"
                             } else {
                                 presValue = presValue.trunc(1)
@@ -312,7 +382,8 @@ private def callAPI() {
             def windSpeed = 0.0
             def windDirection = "N"
             def windGust = 0.0
-            def msgStorm = "No STORM data"
+            def msgStorm = "No Wind data"
+            def msgStormRain = "No Rain data"
             def rainUnit = "in"
             if (("true" == rainMm)) {
                 rainUnit = "mm"
@@ -331,7 +402,7 @@ private def callAPI() {
 
                     switch(key) {
                         case "raindaily":
-                            if (datum < 9000) {
+                            if (datum.toDouble() < 9000) {
                                 rainDaily = datum.toDouble()
                                 if (("true" == rainMm)) {
                                     rainDaily = rainDaily.trunc(1)
@@ -342,7 +413,7 @@ private def callAPI() {
                             sendEvent(name:"rainDaily", value: rainDaily, unit: rainUnit)
                         break;
                         case "rainrate":
-                            if (datum < 9000) {
+                            if (datum.toDouble() < 9000) {
                                 rainRate = datum.toDouble()
                                 if (("true" == rainMm)) {
                                     rainRate = rainRate.trunc(1)
@@ -353,7 +424,7 @@ private def callAPI() {
                             sendEvent(name:"rainRate", value: rainRate, unit: rainUnit+"/h")
                         break;
                         case "sustainedwindspeed":
-                            if (datum < 9000) {
+                            if (datum.toDouble() < 9000) {
                                 windSpeed = datum.toDouble()
                                 if (("true" == windspeedKph)) {
                                     windSpeed =  (windSpeed * 1.609344).round(1).trunc(1)
@@ -364,13 +435,13 @@ private def callAPI() {
                             sendEvent(name:"windSpeed", value: windSpeed, unit: windSpeedUnit)
                         break;
                         case "winddirection":
-                            if (datum < 9000) {
+                            if (datum instanceof String) {
                                 windDirection = datum.toString()
                             }
-                            sendEvent(name:"windDirection", value: datum)
+                            sendEvent(name:"windDirection", value: windDirection)
                         break;
                         case "windgust":
-                            if (datum < 9000) {
+                            if (datum.toDouble() < 9000) {
                                 windGust = datum.toDouble()
                                 if (("true" == windspeedKph)) {
                                     windGust =  (windGust * 1.609344).round(1).trunc(1)
@@ -386,25 +457,27 @@ private def callAPI() {
                     }
                 }
                 //--- Create STORM data message
-                msgStorm = "Wind: " + windSpeed.toString() + windSpeedUnit + "/" + windDirection + " | Rain Rate: " + rainRate.toString() + rainUnit + "/h - Daily: " + rainDaily.toString() + rainUnit
+                msgStorm = "Wind: " + windSpeed.toString() + " " + windSpeedUnit + " / " + windDirection + "  -  Gusts: " + windGust.toString() + " " + windSpeedUnit
+                msgStormRain = "Rain Rate: " + rainRate.toString() + " " + rainUnit + "/h  -  Daily: " + rainDaily.toString() + " " + rainUnit
 
             } else {
                 if (state.debug) log.debug "--- STORM data Disabled"
             }
             sendEvent(name: "msgStorm", value: msgStorm, displayed:false)
+            sendEvent(name: "msgStormRain", value: msgStormRain, displayed:false)
 
         }
     }
     //log exception gracefully
     catch (Exception e) {
-        log.debug "Error: $e"
+        log.debug "Error - callAPI(): $e"
     }
     data.clear()
 }
 
 //convert temp to celcius if needed
 def getTemperature(value) {
-    //def cmdScale = getTemperatureScale()
+    def cmdScale = getTemperatureScale()
     return convertTemperatureIfNeeded(value.toFloat(), "F", 4)
 }
 
@@ -417,8 +490,8 @@ private getPictureName() {
 def getBattery(v) {
     def result = 0
     def miliVolts = v
-    // Minimum: 2480 - Maximum: 2620
-    def minVolts = 2480
+    // Minimum: 2460 - Maximum: 2620
+    def minVolts = 2460
     def maxVolts = 2620
     if (miliVolts >= minVolts) {
         if (miliVolts > maxVolts) {
@@ -432,9 +505,137 @@ def getBattery(v) {
     return result
 }
 
+def tempUnitEvent(unit) {
+	state.tempUnit = unit
+    state.tempMetric = (unit == "C")
+    if (state.debug) log.debug "Temp Unit: ${state?.tempUnit} - Metric: ${state?.tempMetric}"
+}
+
 def tempScale() {
-    //def tempScale = getTemperatureScale()
-    def tempScaleUnit = "C"
+    def tempScaleUnit = state?.tempUnit
     return tempScaleUnit
 }
 
+def getDetailHTML() {
+	try {
+        def _clNormal = "normal"
+        def _clError = "error"
+
+        // Device States
+		def _ultravioletIndex = device.currentState("ultravioletIndex").stringValue
+		def _illuminance = device.currentState("illuminance").stringValue
+		def _humidity = device.currentState("humidity").stringValue
+		def _pressure = device.currentState("pressure").stringValue
+		def _deviceMode = device.currentState("deviceMode").stringValue
+		def _deviceType = device.currentState("deviceType").stringValue
+		def _battery = device.currentState("battery").stringValue
+		def _lastUpdated = device.currentState("lastUpdated").stringValue
+
+		def _windSpeed = device.currentState("windSpeed").stringValue
+		def _windDirection = device.currentState("windDirection").stringValue
+		def _windGust = device.currentState("windGust").stringValue
+		def _rainRate = device.currentState("rainRate").stringValue
+		def _rainDaily = device.currentState("rainDaily").stringValue
+
+        // Units
+        def presUnit = "inHg"
+        if (("true" == pressureMbar)) {
+            presUnit = "mbar"
+        }
+        def rainUnit = "in"
+        if (("true" == rainMm)) {
+            rainUnit = "mm"
+        }
+        def windSpeedUnit = "mph"
+        if (("true" == windspeedKph)) {
+            windSpeedUnit = "kph"
+        }
+
+        // Style / Class settings
+        def _clBattery = _clNormal
+        if (device.currentState("battery").numericValue <= 10) {
+            _clBattery = _clError
+        }
+
+        //--- Create HTML page
+		def html = """
+		<!DOCTYPE html>
+		<html>
+			<head>
+				<meta http-equiv="cache-control" content="max-age=0"/>
+				<meta http-equiv="cache-control" content="no-cache"/>
+				<meta http-equiv="expires" content="0"/>
+				<meta http-equiv="expires" content="Tue, 01 Jan 1980 1:00:00 GMT"/>
+				<meta http-equiv="pragma" content="no-cache"/>
+                <style type="text/css">
+                    table { border: none; border-radius: 3px; width:100%; }
+                    th { padding: 4px; color: #f5f5f5; background-color: #00a1db;}
+                    td { padding: 4px; text-align: center; color: grey; font-weight: bold;}
+                    td.normal { color: grey; font-weight: bold;}
+                    td.error { color: #f5f5f5; font-weight: bold; background-color: red;}
+                </style>
+			</head>
+			<body>
+			    <table>
+				<thead>
+				  <th>UV Index</th>
+				  <th>Luminance</th>
+				  <th>Humidity</th>
+				</thead>
+				<tbody>
+				    <tr>
+					    <td>${_ultravioletIndex} / 11</td>
+					    <td>${_illuminance} Lux</td>
+					    <td>${_humidity}%</td>
+				    </tr>
+				</tbody>
+			    </table>
+			    <table>
+				<thead>
+				  <th>Air Pressure</th>
+				  <th>Wind Speed</th>
+				  <th>Wind Gusts</th>
+				</thead>
+				<tbody>
+				  <tr>
+					<td>${_pressure} ${presUnit}</td>
+					<td>${_windSpeed} ${windSpeedUnit} / ${_windDirection}</td>
+					<td>${_windGust} ${windSpeedUnit}</td>
+				  </tr>
+				</tbody>
+			    </table>
+			    <table>
+				<thead>
+				  <th>Sky Mode</th>
+				  <th>Rain Rate</th>
+				  <th>Rain Daily</th>
+				</thead>
+				<tbody>
+				    <tr>
+					    <td>${_deviceMode}</td>
+					    <td>${_rainRate} ${rainUnit}/h</td>
+					    <td>${_rainDaily} ${rainUnit}</td>
+				    </tr>
+				</tbody>
+			    </table>
+			    <table>
+				<thead>
+				  <th>Battery</th>
+				  <th>Type</th>
+				  <th>Last Updated</th>
+				</thead>
+				<tbody>
+				  <tr>
+					<td class="${_clBattery}">${_battery}%</td>
+					<td>${_deviceType}</td>
+					<td>${_lastUpdated}</td>
+				  </tr>
+			    </table>
+			</body>
+		</html>
+		"""
+		render contentType: "text/html", data: html, status: 200
+	} catch (ex) {
+		log.error "getDetailHTML Exception:", ex
+	}
+}
