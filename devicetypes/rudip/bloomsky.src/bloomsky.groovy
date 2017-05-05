@@ -5,7 +5,8 @@
 *
 *  Version History:  
 *
-*  2.2.0 - 02/07/2017 - HTML testing
+*  2.2.1 - 05/03/2017 - HTML testing
+*  2.1.8 - 05/03/2017 - Using UV from STORM if present. UI improvements.
 *  2.1.7 - 02/06/2017 - Fixed background colors for Temperature in Celsius
 *  2.1.6 - 02/03/2017 - Added tiles for Wind and Rain. Using Temp unit from Location (removed from preferences)
 *  2.1.5 - 02/01/2017 - WindDirection validation fixed
@@ -39,7 +40,7 @@
 *
 */
 
-def getVersion() { return "2.2.0"}
+def getVersion() { return "2.2.1"}
 
 metadata {
     definition (name: "Bloomsky", namespace: "RudiP", author: "Tim Slagle") {
@@ -54,6 +55,7 @@ metadata {
         capability "Water Sensor"
 
         attribute "pressure", "number"
+        attribute "pressureUnit", "string"
         attribute "lastUpdated", "string"
         attribute "deviceMode", "string"
         // STORM data
@@ -103,20 +105,20 @@ metadata {
         valueTile("light", "device.illuminance", decoration: "flat", width: 2, height: 2) {
             state "default", label:'${currentValue} Lux'
         }
-        valueTile("humidity", "device.humidity", inactiveLabel: false, width: 2, height: 2) {
-            state "humidity", label:'${currentValue}% humidity', unit:""
+        valueTile("humidityLabel", "device.humidity", inactiveLabel: false, width: 2, height: 1) {
+            state "default", label:'Humidity'
         }
-        valueTile("pressure", "device.pressure", inactiveLabel: false, width: 2, height: 2) {
-            state("pressure", label:'Pressure:\n${currentValue}', backgroundColors: getPressureColors())
+        valueTile("humidity", "device.humidity", inactiveLabel: false, width: 2, height: 1) {
+            state "humidity", label:'${currentValue}%', unit:""
+        }
+        valueTile("pressureLabel", "device.pressureUnit", width: 2, height: 1) {
+            state("default", label:'Pressure (${currentValue})')
+        }
+        valueTile("pressure", "device.pressure", inactiveLabel: false, width: 2, height: 1) {
+            state("pressure", label:'${currentValue}')
         }
         valueTile("battery", "device.battery", decoration: "flat", width: 2, height: 2) {
-            state "default", label:'${currentValue}% Battery', 
-            backgroundColors:[
-                    [value: 0, color: "#0d0d0c"],
-  					[value: 5, color: "#d04e00"],
-                    [value: 10, color: "#d80010"],
-                    [value: 15, color: "#ffffff"]
-                ]
+            state "default", label:'Battery: ${currentValue}%'
         }
         valueTile("lastUpdated", "device.lastUpdated", decoration: "flat", width: 2, height: 2) {
             state "default", label:'${currentValue}'
@@ -141,7 +143,7 @@ metadata {
             state "default", label: "", action: "refresh", icon:"st.secondary.refresh"
         }
         main(["main"])
-        details(["cameraDetails", "temperature", "water", "uv", "light", "humidity", "deviceMode", "pressure", "lastUpdated", "msgStorm", "msgStormRain", "refresh", "battery", "deviceType", "detailHTML"])
+        details(["cameraDetails", "temperature", "water", "uv", "light", "humidityLabel", "humidity", "deviceMode", "lastUpdated", "pressureLabel", "pressure", "msgStorm", "msgStormRain", "deviceType", "battery", "refresh", "detailHTML"])
         //details(["cameraDetails", "temperature", "water", "detailHTML", "msgStorm", "msgStormRain", "refresh"])
     }
 
@@ -343,6 +345,8 @@ private def callAPI() {
                                 presValue = presValue.trunc(1)
                             }
                             sendEvent(name:"${key}", value: presValue, unit: presUnit)
+                            sendEvent(name:"pressureUnit", value: presUnit, displayed:false)
+
                         break;
                         case "humidity":
                             sendEvent(name: "${key}", value: datum, unit: "%")
