@@ -5,8 +5,8 @@
 *
 *  Version History:  
 *
-*  2.2.1 - 05/03/2017 - HTML testing
-*  2.1.8 - 05/03/2017 - Using UV from STORM if present. UI improvements.
+*  2.1.9 - 06/28/2017 - Using UV from STORM if present and new 24hRain data.
+*  2.1.8 - 05/03/2017 - UI improvements.
 *  2.1.7 - 02/06/2017 - Fixed background colors for Temperature in Celsius
 *  2.1.6 - 02/03/2017 - Added tiles for Wind and Rain. Using Temp unit from Location (removed from preferences)
 *  2.1.5 - 02/01/2017 - WindDirection validation fixed
@@ -40,7 +40,7 @@
 *
 */
 
-def getVersion() { return "2.2.1"}
+def getVersion() { return "2.1.9"}
 
 metadata {
     definition (name: "Bloomsky", namespace: "RudiP", author: "Tim Slagle") {
@@ -61,6 +61,7 @@ metadata {
         // STORM data
         attribute "rainRate", "number"
         attribute "rainDaily", "number"
+        attribute "rain24h", "number"
         attribute "windSpeed", "number"
         attribute "windDirection", "string"
         attribute "windGust", "number"
@@ -137,14 +138,12 @@ metadata {
         valueTile("msgStormRain", "device.msgStormRain", inactiveLabel: false, decoration: "flat", width: 6, height: 2) {
             state "default", label:'${currentValue}'
         }
-		htmlTile(name:"detailHTML", action: "getDetailHTML", width: 6, height: 4)
 
         standardTile("refresh", "device.weather", decoration: "flat", width: 2, height: 2) {
             state "default", label: "", action: "refresh", icon:"st.secondary.refresh"
         }
         main(["main"])
-        details(["cameraDetails", "temperature", "water", "uv", "light", "humidityLabel", "humidity", "deviceMode", "lastUpdated", "pressureLabel", "pressure", "msgStorm", "msgStormRain", "deviceType", "battery", "refresh", "detailHTML"])
-        //details(["cameraDetails", "temperature", "water", "detailHTML", "msgStorm", "msgStormRain", "refresh"])
+        details(["cameraDetails", "temperature", "water", "uv", "light", "humidityLabel", "humidity", "deviceMode", "lastUpdated", "pressureLabel", "pressure", "msgStorm", "msgStormRain", "deviceType", "battery", "refresh"])
     }
 
     preferences {
@@ -155,10 +154,6 @@ metadata {
         input "detailDebug", "boolean", title: "Enable Debug logging?", displayDuringSetup:false, defaultValue:false
     }
 }    
-
-mappings {
-	path("/getDetailHTML") {action: [GET: "getDetailHTML"]}
-}
 
 def getTempColors() {
 	def colorMap = []
@@ -228,15 +223,6 @@ def getPressureColors() {
     return colorMap
 }
 
-def getPressureUnit() {
-	def unit = "inHg"
-    if ("true" == pressureMbar) {
-        unit = "mbar"
-	}
-    return unit
-}
-
-
 def installed() {
     log.info "--- BloomSky - Version: ${getVersion()}"
     log.info "--- Device Created"
@@ -253,6 +239,7 @@ def updated() {
     if (!("true" == enableStorm)) {
         sendEvent(name:"rainRate", value: 0.0, displayed:false)
         sendEvent(name:"rainDaily", value: 0.0, displayed:false)
+        sendEvent(name:"rain24h", value: 0.0, displayed:false)
         sendEvent(name:"windSpeed", value: 0.0, displayed:false)
         sendEvent(name:"windDirection", value: "N", displayed:false)
         sendEvent(name:"windGust", value: 0.0, displayed:false)
@@ -300,7 +287,10 @@ private def callAPI() {
                 individualBloomSky = resp.data[0]
                 if (state.debug) log.debug "Using BloomSky ID: ${individualBloomSky.DeviceID}"
             }
-            
+
+            // Initialize data fields for both (Sky & Storm)
+            def uvindex = 0
+
             // Bloomsky (SKY1/SKY2) data
             data << individualBloomSky.Data
             if (data) {
@@ -333,16 +323,17 @@ private def callAPI() {
                             sendEvent(name: "illuminance", value: datum, unit: "Lux")
                         break;
                         case "uvindex": //bloomsky does UV index! how cool is that!?
-                            sendEvent(name: "ultravioletIndex", value: datum)
+                            uvindex = datum.toInteger()
                         break;
                         case "pressure": 
                             def presValue = datum.toDouble().trunc(2)
                             def presUnit = "inHg"
                             if (("true" == pressureMbar)) {
-                                presValue =  (presValue * 33.8639).round(0).toInteger()
+                                //presValue =  (presValue * 33.8639).round(0).toInteger()
+                                presValue =  (presValue * 33.8639).trunc(1)
                                 presUnit = "mbar"
                             } else {
-                                presValue = presValue.trunc(1)
+                                presValue = presValue.trunc(2)
                             }
                             sendEvent(name:"${key}", value: presValue, unit: presUnit)
                             sendEvent(name:"pressureUnit", value: presUnit, displayed:false)
@@ -383,6 +374,7 @@ private def callAPI() {
             data << individualBloomSky.Storm
             def rainRate = 0.0
             def rainDaily = 0.0
+            def rain24h = 0.0
             def windSpeed = 0.0
             def windDirection = "N"
             def windGust = 0.0
@@ -405,6 +397,9 @@ private def callAPI() {
                     if (state.debug) log.debug "${key}:${datum}"
 
                     switch(key) {
+                        case "uvindex":
+                            uvindex = datum.toInteger()
+                        break;
                         case "raindaily":
                             if (datum.toDouble() < 9000) {
                                 rainDaily = datum.toDouble()
@@ -415,6 +410,17 @@ private def callAPI() {
                                 }
                             }
                             sendEvent(name:"rainDaily", value: rainDaily, unit: rainUnit)
+                        break;
+                        case "24hrain":
+                            if (datum.toDouble() < 9000) {
+                                rain24h = datum.toDouble()
+                                if (("true" == rainMm)) {
+                                    rain24h = rain24h.trunc(1)
+                                } else {
+                                    rain24h =  (rain24h * 0.039370).round(1).trunc(1)
+                                }
+                            }
+                            sendEvent(name:"rain24h", value: rain24h, unit: rainUnit)
                         break;
                         case "rainrate":
                             if (datum.toDouble() < 9000) {
@@ -462,11 +468,14 @@ private def callAPI() {
                 }
                 //--- Create STORM data message
                 msgStorm = "Wind: " + windSpeed.toString() + " " + windSpeedUnit + " / " + windDirection + "  -  Gusts: " + windGust.toString() + " " + windSpeedUnit
-                msgStormRain = "Rain Rate: " + rainRate.toString() + " " + rainUnit + "/h  -  Daily: " + rainDaily.toString() + " " + rainUnit
+                msgStormRain = "Rain Rate: " + rainRate.toString() + " " + rainUnit + "/h  -  Daily: " + rainDaily.toString() + " " + rainUnit + " - Last 24h: " + rain24h.toString() + " " + rainUnit
 
             } else {
                 if (state.debug) log.debug "--- STORM data Disabled"
             }
+
+            // Send Events for both Sky & Storm
+            sendEvent(name: "ultravioletIndex", value: uvindex)
             sendEvent(name: "msgStorm", value: msgStorm, displayed:false)
             sendEvent(name: "msgStormRain", value: msgStormRain, displayed:false)
 
@@ -518,128 +527,4 @@ def tempUnitEvent(unit) {
 def tempScale() {
     def tempScaleUnit = state?.tempUnit
     return tempScaleUnit
-}
-
-def getDetailHTML() {
-	try {
-        def _clNormal = "normal"
-        def _clError = "error"
-
-        // Device States
-		def _ultravioletIndex = device.currentState("ultravioletIndex").stringValue
-		def _illuminance = device.currentState("illuminance").stringValue
-		def _humidity = device.currentState("humidity").stringValue
-		def _pressure = device.currentState("pressure").stringValue
-		def _deviceMode = device.currentState("deviceMode").stringValue
-		def _deviceType = device.currentState("deviceType").stringValue
-		def _battery = device.currentState("battery").stringValue
-		def _lastUpdated = device.currentState("lastUpdated").stringValue
-
-		def _windSpeed = device.currentState("windSpeed").stringValue
-		def _windDirection = device.currentState("windDirection").stringValue
-		def _windGust = device.currentState("windGust").stringValue
-		def _rainRate = device.currentState("rainRate").stringValue
-		def _rainDaily = device.currentState("rainDaily").stringValue
-
-        // Units
-        def presUnit = "inHg"
-        if (("true" == pressureMbar)) {
-            presUnit = "mbar"
-        }
-        def rainUnit = "in"
-        if (("true" == rainMm)) {
-            rainUnit = "mm"
-        }
-        def windSpeedUnit = "mph"
-        if (("true" == windspeedKph)) {
-            windSpeedUnit = "kph"
-        }
-
-        // Style / Class settings
-        def _clBattery = _clNormal
-        if (device.currentState("battery").numericValue <= 10) {
-            _clBattery = _clError
-        }
-
-        //--- Create HTML page
-		def html = """
-		<!DOCTYPE html>
-		<html>
-			<head>
-				<meta http-equiv="cache-control" content="max-age=0"/>
-				<meta http-equiv="cache-control" content="no-cache"/>
-				<meta http-equiv="expires" content="0"/>
-				<meta http-equiv="expires" content="Tue, 01 Jan 1980 1:00:00 GMT"/>
-				<meta http-equiv="pragma" content="no-cache"/>
-                <style type="text/css">
-                    table { border: none; border-radius: 3px; width:100%; }
-                    th { padding: 4px; color: #f5f5f5; background-color: #00a1db;}
-                    td { padding: 4px; text-align: center; color: grey; font-weight: bold;}
-                    td.normal { color: grey; font-weight: bold;}
-                    td.error { color: #f5f5f5; font-weight: bold; background-color: red;}
-                </style>
-			</head>
-			<body>
-			    <table>
-				<thead>
-				  <th>UV Index</th>
-				  <th>Luminance</th>
-				  <th>Humidity</th>
-				</thead>
-				<tbody>
-				    <tr>
-					    <td>${_ultravioletIndex} / 11</td>
-					    <td>${_illuminance} Lux</td>
-					    <td>${_humidity}%</td>
-				    </tr>
-				</tbody>
-			    </table>
-			    <table>
-				<thead>
-				  <th>Air Pressure</th>
-				  <th>Wind Speed</th>
-				  <th>Wind Gusts</th>
-				</thead>
-				<tbody>
-				  <tr>
-					<td>${_pressure} ${presUnit}</td>
-					<td>${_windSpeed} ${windSpeedUnit} / ${_windDirection}</td>
-					<td>${_windGust} ${windSpeedUnit}</td>
-				  </tr>
-				</tbody>
-			    </table>
-			    <table>
-				<thead>
-				  <th>Sky Mode</th>
-				  <th>Rain Rate</th>
-				  <th>Rain Daily</th>
-				</thead>
-				<tbody>
-				    <tr>
-					    <td>${_deviceMode}</td>
-					    <td>${_rainRate} ${rainUnit}/h</td>
-					    <td>${_rainDaily} ${rainUnit}</td>
-				    </tr>
-				</tbody>
-			    </table>
-			    <table>
-				<thead>
-				  <th>Battery</th>
-				  <th>Type</th>
-				  <th>Last Updated</th>
-				</thead>
-				<tbody>
-				  <tr>
-					<td class="${_clBattery}">${_battery}%</td>
-					<td>${_deviceType}</td>
-					<td>${_lastUpdated}</td>
-				  </tr>
-			    </table>
-			</body>
-		</html>
-		"""
-		render contentType: "text/html", data: html, status: 200
-	} catch (ex) {
-		log.error "getDetailHTML Exception:", ex
-	}
 }
